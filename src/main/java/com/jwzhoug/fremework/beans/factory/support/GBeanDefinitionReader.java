@@ -35,7 +35,7 @@ public class GBeanDefinitionReader {
     public GBeanDefinitionReader(String... locations) {
         // 通过URL定位找到其对应的文件，然后转换成文件流
         InputStream is = this.getClass().getClassLoader()
-                .getResourceAsStream(locations[0].replace("classpath", ""));
+                .getResourceAsStream(locations[0].replace("classpath:", ""));
         try {
             config.load(is);
         } catch (Exception e) {
@@ -50,6 +50,7 @@ public class GBeanDefinitionReader {
             }
         }
 
+        // 扫描指定包路径
         doScanner(config.getProperty(SCAN_PACKAGE));
     }
 

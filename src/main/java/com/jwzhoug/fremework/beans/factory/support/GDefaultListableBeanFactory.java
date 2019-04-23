@@ -14,6 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class GDefaultListableBeanFactory extends GAbstractApplicationContext {
 
-    // 存储注册信息
+    // 存储注册信息（beanName,实例）
     protected final Map<String, GBeanDefinition> beanDefinitionMap = new ConcurrentHashMap<String, GBeanDefinition>();
 }

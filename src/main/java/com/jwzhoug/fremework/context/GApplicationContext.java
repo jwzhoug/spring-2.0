@@ -24,12 +24,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class GApplicationContext extends GDefaultListableBeanFactory implements GBeanFactory {
 
+    // 配置文件存放
     private String[] configLocations;
+    // BeanDefinition阅读器
     private GBeanDefinitionReader reader;
 
-    // 单例缓存IOC容器
+    // 单例缓存IOC容器（原始实例）
     private Map<String, Object> singletonObjects = new ConcurrentHashMap<String, Object>();
-    // 通用的IOC容器
+    // 通用的IOC容器 （包装过实例）
     private Map<String, GBeanWrapper> factoryBeanInstanceCache = new ConcurrentHashMap<String, GBeanWrapper>();
 
     public GApplicationContext(String... configLocations) {
@@ -121,14 +123,15 @@ public class GApplicationContext extends GDefaultListableBeanFactory implements 
         // 将实例封装到包装类中
         GBeanWrapper beanWrapper = new GBeanWrapper(instance);
 
-        // 得到包装对象后，保存到 IOC容器中
+        // 2、得到包装对象后，保存到 IOC容器中
         this.factoryBeanInstanceCache.put(beanName, beanWrapper);
 
         postProcessor.postProcessAfterInitialization(instance, beanName);
 
+        // 3、注入
         populateBean(beanName, new GBeanDefinition(), beanWrapper);
 
-        return null;
+        return this.factoryBeanInstanceCache.get(beanName).getWrapperedInstance();
     }
 
     private void populateBean(String beanName, GBeanDefinition gBeanDefinition, GBeanWrapper beanWrapper) {

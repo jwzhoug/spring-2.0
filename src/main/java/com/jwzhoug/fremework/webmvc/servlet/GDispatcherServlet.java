@@ -10,13 +10,12 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -35,7 +34,9 @@ public class GDispatcherServlet extends HttpServlet {
 
     private List<GHandlerMapping> handlerMappings = new ArrayList<GHandlerMapping>();
 
-    private Map<GHandlerMapping,GHandlerAdapter> handlerAdapters = new HashMap<GHandlerMapping, GHandlerAdapter>();
+    private Map<GHandlerMapping, GHandlerAdapter> handlerAdapters = new HashMap<GHandlerMapping, GHandlerAdapter>();
+
+    private List<GViewResolver> viewResolvers = new ArrayList<GViewResolver>();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -44,13 +45,106 @@ public class GDispatcherServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        doDispatch(req, resp);
+        try {
+            this.doDispatch(req, resp);
+        } catch (Exception e) {
+            resp.getWriter().write("500 Exception,Details:\n\r" +
+                    Arrays.toString(e.getStackTrace()).replaceAll("\\[|\\]]", ""));
+        }
+
     }
 
-    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) {
-        // 处理请求
+    /**
+     * 处理请求 > 相当于源码中 this.doService()
+     *
+     * @param req
+     * @param resp
+     */
+    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+
+        // 1.用请求中对应的url 获取 handlerMapping
+        GHandlerMapping handler = getHandler(req);
+
+        if (handler == null) {
+            processDispatchResult(req, resp, new GModelAndView("404"));
+            return;
+        }
+
+        // 2.准备调用前的参数
+        GHandlerAdapter ha = getHandlerAdapter(handler);
+
+        // 3.真正的调用方法，返回ModelAndView存储了要传上页面的值，和页面模板名称
+        GModelAndView mav = ha.handle(req, resp, handler);
+
+        processDispatchResult(req, resp, mav);
+
     }
 
+    private GHandlerAdapter getHandlerAdapter(GHandlerMapping handler) {
+
+        if (this.handlerAdapters.isEmpty()) {
+            return null;
+        }
+        GHandlerAdapter ha = this.handlerAdapters.get(handler);
+        if (ha.supports(handler)) {
+            return ha;
+        }
+        return null;
+    }
+
+    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, GModelAndView mav) throws Exception {
+
+        if (mav == null) {
+            return;
+        }
+
+        if (this.viewResolvers.isEmpty()) {
+            return;
+        }
+
+        for (GViewResolver viewResolver : this.viewResolvers) {
+            // 处理mav -> 得到带渲染视图
+            GView view = viewResolver.resolveViewName(mav.getViewName(), null);
+            // 渲染视图
+            view.render(mav.getModel(), req, resp);
+            return;
+        }
+
+    }
+
+    /**
+     * 匹配到对应的GHandlerMapping
+     *
+     * @param req
+     * @return
+     */
+    private GHandlerMapping getHandler(HttpServletRequest req) {
+
+        if (this.handlerMappings.isEmpty()) {
+            return null;
+        }
+
+        String url = req.getRequestURI();
+        String contextPath = req.getContextPath();
+        url = url.replace(contextPath, "").replaceAll("/+", "/");
+
+        for (GHandlerMapping handlerMapping : this.handlerMappings) {
+            Matcher matcher = handlerMapping.getPattern().matcher(url);
+            if (!matcher.matches()) {
+                continue;
+            }
+            return handlerMapping;
+        }
+
+        return null;
+    }
+
+    /**
+     * 初始化
+     *
+     * @param config
+     * @throws ServletException
+     */
     @Override
     public void init(ServletConfig config) throws ServletException {
         // 1. 初始化ApplicationContext
@@ -94,6 +188,17 @@ public class GDispatcherServlet extends HttpServlet {
 
     private void initViewResolvers(GApplicationContext context) {
 
+        // 拿到模板的存放目录
+        String templateRoot = context.getConfig().getProperty("templateRoot");
+        String templateRootPath = this.getClass().getClassLoader().getResource(templateRoot).getFile();
+
+        File templateRootDir = new File(templateRootPath);
+        String[] templates = templateRootDir.list();
+        for (int i = 0; i < templates.length; i++) {
+            // 兼容多模板
+            this.viewResolvers.add(new GViewResolver(templateRoot));
+        }
+
     }
 
     private void initRequestToViewNameTranslator(GApplicationContext context) {
@@ -105,7 +210,7 @@ public class GDispatcherServlet extends HttpServlet {
     private void initHandlerAdapters(GApplicationContext context) {
 
         for (GHandlerMapping handlerMapping : this.handlerMappings) {
-            this.handlerAdapters.put(handlerMapping,new GHandlerAdapter());
+            this.handlerAdapters.put(handlerMapping, new GHandlerAdapter());
         }
 
 

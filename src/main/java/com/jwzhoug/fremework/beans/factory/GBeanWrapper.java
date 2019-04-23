@@ -1,7 +1,7 @@
 package com.jwzhoug.fremework.beans.factory;
 
 /**
- * TODO...
+ * BeanDefinition包装类 > 不直接返回BeanDefinition实例
  *
  * @author: zhoujw
  * @Date: 2019-04-19
