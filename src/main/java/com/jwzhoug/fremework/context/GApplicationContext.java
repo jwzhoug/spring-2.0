@@ -3,6 +3,11 @@ package com.jwzhoug.fremework.context;
 import com.jwzhoug.fremework.annotation.GPAutowired;
 import com.jwzhoug.fremework.annotation.GPController;
 import com.jwzhoug.fremework.annotation.GPService;
+import com.jwzhoug.fremework.aop.GAopProxy;
+import com.jwzhoug.fremework.aop.GCglibAopProxy;
+import com.jwzhoug.fremework.aop.GJdkDynamicAopProxy;
+import com.jwzhoug.fremework.aop.config.GAopConfig;
+import com.jwzhoug.fremework.aop.support.GAdvisedSupport;
 import com.jwzhoug.fremework.beans.factory.GBeanWrapper;
 import com.jwzhoug.fremework.beans.factory.config.GBeanDefinition;
 import com.jwzhoug.fremework.beans.factory.config.GPBeanPostProcessor;
@@ -190,6 +195,16 @@ public class GApplicationContext extends GDefaultListableBeanFactory implements 
             } else {
                 Class<?> clazz = Class.forName(className);
                 instance = clazz.newInstance();
+
+                GAdvisedSupport config = instantionAopConfig();
+                config.setTarget(instance);
+                config.setTargetClass(clazz);
+
+                // 校验目标类是否匹配对应得正则
+                if (config.pointCutMatch()) {
+                    instance = createProxy(config).getProxy();
+                }
+
                 this.singletonObjects.put(className, instance);
                 this.singletonObjects.put(beanDefinition.getFactoryBeanName(), instance);
             }
@@ -199,6 +214,38 @@ public class GApplicationContext extends GDefaultListableBeanFactory implements 
         }
 
         return instance;
+    }
+
+    /**
+     * 创建代理对象实例
+     *
+     * @param config
+     * @return
+     */
+    private GAopProxy createProxy(GAdvisedSupport config) {
+
+        Class<?> targetClass = config.getTargetClass();
+        // 判断是否有接口实现 > 来确认 代理类型
+        if (targetClass.getInterfaces().length > 0) {
+            return new GJdkDynamicAopProxy(config);
+        }
+        return new GCglibAopProxy(config);
+    }
+
+    /**
+     * 实例化 GAdviceSupport
+     *
+     * @return
+     */
+    private GAdvisedSupport instantionAopConfig() {
+        GAopConfig config = new GAopConfig();
+        config.setPointCut(this.reader.getConfig().getProperty("pointCut"));
+        config.setAspectClass(this.reader.getConfig().getProperty("aspectClass"));
+        config.setAspectBefore(this.reader.getConfig().getProperty("aspectBefore"));
+        config.setAspectAfter(this.reader.getConfig().getProperty("aspectAfter"));
+        config.setAspectAfterThrow(this.reader.getConfig().getProperty("aspectAfterThrow"));
+        config.setAspectAfterThrowingName(this.reader.getConfig().getProperty("aspectAfterThrowingName"));
+        return new GAdvisedSupport(config);
     }
 
     @Override
