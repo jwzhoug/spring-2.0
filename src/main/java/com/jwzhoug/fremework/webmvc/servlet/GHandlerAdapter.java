@@ -1,7 +1,7 @@
 package com.jwzhoug.fremework.webmvc.servlet;
 
 import com.jwzhoug.fremework.annotation.GPRequestParam;
-import sun.security.action.PutAllAction;
+//import sun.security.action.PutAllAction;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -87,7 +87,7 @@ public class GHandlerAdapter {
         }
 
         boolean isModelAndView = handlerMapping.getMethod().getReturnType() == GModelAndView.class;
-        if (isModelAndView){
+        if (isModelAndView) {
             return (GModelAndView) result;
         }
 
